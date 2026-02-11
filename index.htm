@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Супер Пазли</title>
+    <style>
+        :root {
+            --primary: #6c5ce7;
+            --bg: #f0f2f5;
+            --card-bg: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            color: #2d3436;
+        }
+
+        #menu, #game-container {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-top: 50px;
+            text-align: center;
+            max-width: 90vw;
+        }
+
+        h1 { color: var(--primary); margin-bottom: 30px; }
+
+        .grid-select {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .img-card {
+            cursor: pointer;
+            border: 3px solid transparent;
+            border-radius: 12px;
+            transition: 0.3s;
+            overflow: hidden;
+            background: #eee;
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .img-card.selected { border-color: var(--primary); transform: scale(1.05); }
+        .img-card img { width: 100%; height: 100%; object-fit: cover; }
+
+        .difficulty-btns button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            background: #dfe6e9;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        .difficulty-btns button.selected { background: var(--primary); color: white; }
+
+        #start-btn {
+            margin-top: 30px;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            background: #00b894;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        #start-btn:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,184,148,0.4); }
+
+        /* Game Board Styles */
+        #game-board {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            display: none;
+        }
+
+        #puzzle-grid {
+            position: relative;
+            background: #dfe6e9;
+            border: 2px solid #b2bec3;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        #pieces-pool {
+            width: 300px;
+            min-height: 400px;
+            background: #f9f9f9;
+            border: 2px dashed #ccc;
+            border-radius: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            align-content: flex-start;
+            padding: 10px;
+            gap: 5px;
+        }
+
+        .puzzle-piece {
+            cursor: grab;
+            user-select: none;
+            box-sizing: border-box;
+            border: 0.5px solid rgba(255,255,255,0.3);
+        }
+
+        .slot {
+            position: absolute;
+            box-sizing: border-box;
+            border: 0.5px solid rgba(0,0,0,0.05);
+        }
+
+        .hidden { display: none !important; }
+
+        #win-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 0 100px rgba(0,0,0,0.5);
+            z-index: 100;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div id="menu">
+    <h1>Обери свій пазл</h1>
+    
+    <div class="grid-select" id="image-selector">
+        <div class="img-card" data-img="Tito.png">Tito</div>
+        <div class="img-card" data-img="Smartik.png">Smartik</div>
+        <div class="img-card" data-img="Junior.png">Junior</div>
+        <div class="img-card" data-img="Fil.png">Fil</div>
+        <div class="img-card" data-img="Milka.png">Milka</div>
+    </div>
+
+    <h3>Обери складність</h3>
+    <div class="difficulty-btns" id="diff-selector">
+        <button data-size="3">3 x 3</button>
+        <button data-size="6">6 x 6</button>
+        <button data-size="12">12 x 12</button>
+        <button data-size="30">30 x 30 (Хардкор!)</button>
+    </div>
+
+    <button id="start-btn">ГРАТИ</button>
+</div>
+
+<div id="game-container" class="hidden">
+    <button onclick="location.reload()" style="margin-bottom: 20px;">⬅ Назад до меню</button>
+    <div id="game-board">
+        <div id="puzzle-grid"></div>
+        <div id="pieces-pool"></div>
+    </div>
+</div>
+
+<div id="win-message">
+    <h2>Вітаю! Ти зібрав пазл! 🎉</h2>
+    <button onclick="location.reload()">Грати знову</button>
+</div>
+
+<script>
+    let selectedImg = '';
+    let gridSize = 3;
+    const puzzleGrid = document.getElementById('puzzle-grid');
+    const piecesPool = document.getElementById('pieces-pool');
+
+    // Вибір картинки
+    document.querySelectorAll('.img-card').forEach(card => {
+        card.addEventListener('click', () => {
+            document.querySelectorAll('.img-card').forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+            selectedImg = card.dataset.img;
+        });
+    });
+
+    // Вибір складності
+    document.querySelectorAll('#diff-selector button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('#diff-selector button').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            gridSize = parseInt(btn.dataset.size);
+        });
+    });
+
+    // Початок гри
+    document.getElementById('start-btn').addEventListener('click', () => {
+        if (!selectedImg) return alert('Будь ласка, обери картинку!');
+        
+        document.getElementById('menu').classList.add('hidden');
+        document.getElementById('game-container').classList.remove('hidden');
+        document.getElementById('game-board').style.display = 'flex';
+        
+        initGame();
+    });
+
+    function initGame() {
+        const containerSize = Math.min(window.innerWidth * 0.8, 600);
+        const pieceSize = containerSize / gridSize;
+
+        puzzleGrid.style.width = containerSize + 'px';
+        puzzleGrid.style.height = containerSize + 'px';
+
+        let pieces = [];
+
+        for (let y = 0; y < gridSize; y++) {
+            for (let x = 0; x < gridSize; x++) {
+                // Створюємо слот на сітці
+                const slot = document.createElement('div');
+                slot.className = 'slot';
+                slot.style.width = pieceSize + 'px';
+                slot.style.height = pieceSize + 'px';
+                slot.style.left = (x * pieceSize) + 'px';
+                slot.style.top = (y * pieceSize) + 'px';
+                slot.dataset.x = x;
+                slot.dataset.y = y;
+                puzzleGrid.appendChild(slot);
+
+                // Створюємо шматочок пазла
+                const piece = document.createElement('div');
+                piece.className = 'puzzle-piece';
+                piece.draggable = true;
+                piece.style.width = pieceSize + 'px';
+                piece.style.height = pieceSize + 'px';
+                piece.style.backgroundImage = `url(${selectedImg})`;
+                piece.style.backgroundSize = `${containerSize}px ${containerSize}px`;
+                piece.style.backgroundPosition = `-${x * pieceSize}px -${y * pieceSize}px`;
+                
+                piece.dataset.correctX = x;
+                piece.dataset.correctY = y;
+                
+                // Додаємо Drag & Drop події
+                piece.addEventListener('dragstart', dragStart);
+                pieces.push(piece);
+            }
+        }
+
+        // Перемішуємо пазли
+        pieces.sort(() => Math.random() - 0.5);
+        pieces.forEach(p => piecesPool.appendChild(p));
+
+        // Налаштування цілей для Drop
+        puzzleGrid.addEventListener('dragover', e => e.preventDefault());
+        puzzleGrid.addEventListener('drop', handleDrop);
+    }
+
+    let draggedPiece = null;
+
+    function dragStart(e) {
+        draggedPiece = e.target;
+    }
+
+    function handleDrop(e) {
+        e.preventDefault();
+        const rect = puzzleGrid.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        const pieceSize = parseFloat(draggedPiece.style.width);
+        const gridX = Math.floor(x / pieceSize);
+        const gridY = Math.floor(y / pieceSize);
+
+        // Перевірка, чи потрапили в правильну клітинку
+        if (gridX == draggedPiece.dataset.correctX && gridY == draggedPiece.dataset.correctY) {
+            draggedPiece.style.position = 'absolute';
+            draggedPiece.style.left = (gridX * pieceSize) + 'px';
+            draggedPiece.style.top = (gridY * pieceSize) + 'px';
+            draggedPiece.draggable = false;
+            draggedPiece.style.cursor = 'default';
+            draggedPiece.style.zIndex = '1';
+            puzzleGrid.appendChild(draggedPiece);
+            
+            checkWin();
+        }
+    }
+
+    function checkWin() {
+        const placedPieces = puzzleGrid.querySelectorAll('.puzzle-piece').length;
+        if (placedPieces === gridSize * gridSize) {
+            document.getElementById('win-message').style.display = 'block';
+        }
+    }
+</script>
+
+</body>
+</html>
